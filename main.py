@@ -80,7 +80,7 @@ def onload():
     signInButton.pack(pady=PADDING)
     createAccButton.pack(pady=PADDING)
 
-    global createAccFrame
+    global createAccFrame, crPassLenLabel, crPassMatchLabel, crPasswordInput, crPassConfirmInput
     createAccFrame = makeFrame(root)
     crUsernameInput = tk.StringVar(root)
     crUsernameLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Username: "), tk.LEFT)
@@ -92,21 +92,26 @@ def onload():
     crEmailEntry = makeEntry(createAccFrame, crEmailInput)
     crEmailLabel.grid(column=0, row=1, pady=PADDING)
     crEmailEntry.grid(column=1, row=1, pady=PADDING)
-    crPassInfoLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Your password should be at least 8 characters long!"), tk.CENTER)
-    crPassInfoLabel.grid(column=0, row=2, columnspan=2)
-    crPassInfoLabel.config(fg=COLOURS["fg"])
+    crPassLenLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Your password should be at least 8 characters long!"), tk.CENTER)
+    crPassLenLabel.config(fg=COLOURS["fg"])
+    crPassLenLabel.grid(column=0, row=2, columnspan=2)
+    crPassMatchLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Those passwords don't match!"), tk.CENTER)
+    crPassMatchLabel.config(fg=COLOURS["fg"])
+    #crPassMatchLabel.grid(column=0, row=3, columnspan=2)
     crPasswordInput = tk.StringVar(root)
+    crPasswordInput.trace_add("write", checkPasswords)
     crPasswordLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Password: "), tk.LEFT)
     crPasswordEntry = makeEntryPass(createAccFrame, crPasswordInput)
-    crPasswordLabel.grid(column=0, row=3, pady=PADDING)
-    crPasswordEntry.grid(column=1, row=3, pady=PADDING)
+    crPasswordLabel.grid(column=0, row=4, pady=PADDING)
+    crPasswordEntry.grid(column=1, row=4, pady=PADDING)
     crPassConfirmInput = tk.StringVar(root)
+    crPassConfirmInput.trace_add("write", checkPasswords)
     crPassConfirmLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Confirm Password: "), tk.LEFT)
     crPassConfirmEntry = makeEntryPass(createAccFrame, crPassConfirmInput)
-    crPassConfirmLabel.grid(column=0, row=4, pady=PADDING)
-    crPassConfirmEntry.grid(column=1, row=4, pady=PADDING)
+    crPassConfirmLabel.grid(column=0, row=5, pady=PADDING)
+    crPassConfirmEntry.grid(column=1, row=5, pady=PADDING)
     crSubmitButton = makeButton(createAccFrame, "Create Account", lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get(), crPassConfirmInput.get()))
-    crSubmitButton.grid(column=0, row=5, columnspan=2, pady=PADDING)
+    crSubmitButton.grid(column=0, row=6, columnspan=2, pady=PADDING)
 
     global signInFrame
     signInFrame = makeFrame(root)
@@ -171,9 +176,29 @@ def notARobot(before, after):
     submitButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
 
     notARobotFrame.pack()
+
+validPasswords = False
+def checkPasswords(var, index, mode):
+    if len(crPasswordInput.get()) < 8:
+        print("not enough")
+        crPassLenLabel.grid(column=0, row=2, columnspan=2)
+    else:
+        print("enough")
+        crPassLenLabel.grid_forget()
     
+    if crPasswordInput.get() == crPassConfirmInput.get():
+        print("match")
+        crPassMatchLabel.grid_forget()
+    else:
+        print("no match")
+        crPassMatchLabel.grid(column=0, row=3, columnspan=2)
+
 def createAccProcess(username:str, email:str, password:str, confirm:str):
-    print("Doing something...")
+    if not validPasswords:
+        ...
+    else:
+        #Username exists
+        ...
 
 def signInProcess(username, password):
     ...
