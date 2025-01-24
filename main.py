@@ -7,18 +7,17 @@ def createCAPTCHA(text:str) -> None:
     image = ImageCaptcha(width=360, height=120)
     image.write(text, "./images/CAPTCHA.png")
 
-def getData() -> object:
-    import ast
-    # Decrypt string here
+def getData() -> dict:
+    # Decrypt binary here
     with open("data.pickle", "rb") as f:
-        return ast.literal_eval(pickle.load(f))
+        return pickle.load(f)
 
 def setData(overwrite) -> None:
-    string = str(overwrite)
-    #Encrypt string here
     with open("data.pickle", "wb") as f:
-        pickle.dump(string, f)
+        pickle.dump(overwrite, f)
+    #Encrypt binary here
 
+userCipherKey = ""
 def hashCipherKey(data:str) -> str:
     string = data.encode("utf-8")
     hashBin = bin(int(hashlib.sha3_512(string).hexdigest(), 16))
@@ -64,7 +63,7 @@ root.state("zoomed")
 root.title("TPSSECURITY")
 root.iconbitmap("./images/icon.ico")
 root.config(bg=COLOURS["bg"])
-root.config(cursor="@default.cur")
+root.config(cursor="@./cursors/default.cur")
 title = tk.StringVar(root, value="TPSSECURITY")
 
 def onload():
@@ -80,38 +79,43 @@ def onload():
     signInButton.pack(pady=PADDING)
     createAccButton.pack(pady=PADDING)
 
-    global createAccFrame, crPassLenLabel, crPassMatchLabel, crPasswordInput, crPassConfirmInput
+    global createAccFrame, crPassLenLabel, crPassMatchLabel, crUserExistsLabel, crSubmitButton, crEmailInput, crPasswordInput, crPassConfirmInput, crUsernameInput
     createAccFrame = makeFrame(root)
+    crUserExistsLabel = makeLabel(createAccFrame, tk.StringVar(root, value="That username is already in use. Pick a different one!"), tk.CENTER)
+    crUserExistsLabel.config(fg=COLOURS["fg"])
+    #crUserExistsLabel.grid(column=0, row=0, columnspan=2)
     crUsernameInput = tk.StringVar(root)
+    crUsernameInput.trace_add("write", checkCrData)
     crUsernameLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Username: "), tk.LEFT)
     crUsernameEntry = makeEntry(createAccFrame, crUsernameInput)
-    crUsernameLabel.grid(column=0, row=0, pady=PADDING)
-    crUsernameEntry.grid(column=1, row=0, pady=PADDING)
+    crUsernameLabel.grid(column=0, row=1, pady=PADDING)
+    crUsernameEntry.grid(column=1, row=1, pady=PADDING)
     crEmailInput = tk.StringVar(root)
+    crEmailInput.trace_add("write", checkCrData)
     crEmailLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Email address: "), tk.LEFT)
     crEmailEntry = makeEntry(createAccFrame, crEmailInput)
-    crEmailLabel.grid(column=0, row=1, pady=PADDING)
-    crEmailEntry.grid(column=1, row=1, pady=PADDING)
+    crEmailLabel.grid(column=0, row=2, pady=PADDING)
+    crEmailEntry.grid(column=1, row=2, pady=PADDING)
     crPassLenLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Your password should be at least 8 characters long!"), tk.CENTER)
     crPassLenLabel.config(fg=COLOURS["fg"])
-    crPassLenLabel.grid(column=0, row=2, columnspan=2)
+    crPassLenLabel.grid(column=0, row=3, columnspan=2)
     crPassMatchLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Those passwords don't match!"), tk.CENTER)
     crPassMatchLabel.config(fg=COLOURS["fg"])
-    #crPassMatchLabel.grid(column=0, row=3, columnspan=2)
+    #crPassMatchLabel.grid(column=0, row=4, columnspan=2)
     crPasswordInput = tk.StringVar(root)
-    crPasswordInput.trace_add("write", checkPasswords)
+    crPasswordInput.trace_add("write", checkCrData)
     crPasswordLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Password: "), tk.LEFT)
     crPasswordEntry = makeEntryPass(createAccFrame, crPasswordInput)
-    crPasswordLabel.grid(column=0, row=4, pady=PADDING)
-    crPasswordEntry.grid(column=1, row=4, pady=PADDING)
+    crPasswordLabel.grid(column=0, row=5, pady=PADDING)
+    crPasswordEntry.grid(column=1, row=5, pady=PADDING)
     crPassConfirmInput = tk.StringVar(root)
-    crPassConfirmInput.trace_add("write", checkPasswords)
+    crPassConfirmInput.trace_add("write", checkCrData)
     crPassConfirmLabel = makeLabel(createAccFrame, tk.StringVar(root, value="Confirm Password: "), tk.LEFT)
     crPassConfirmEntry = makeEntryPass(createAccFrame, crPassConfirmInput)
-    crPassConfirmLabel.grid(column=0, row=5, pady=PADDING)
-    crPassConfirmEntry.grid(column=1, row=5, pady=PADDING)
-    crSubmitButton = makeButton(createAccFrame, "Create Account", lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get(), crPassConfirmInput.get()))
-    crSubmitButton.grid(column=0, row=6, columnspan=2, pady=PADDING)
+    crPassConfirmLabel.grid(column=0, row=6, pady=PADDING)
+    crPassConfirmEntry.grid(column=1, row=6, pady=PADDING)
+    crSubmitButton = makeButton(createAccFrame, "Create Account", lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get()))
+    crSubmitButton.grid(column=0, row=7, columnspan=2, pady=PADDING)
 
     global signInFrame
     signInFrame = makeFrame(root)
@@ -132,7 +136,7 @@ def onload():
 
 def makeButton(parent, text, command):
     border = tk.Frame(parent, bg=COLOURS["bd"])
-    button = tk.Button(border, activebackground=COLOURS["fg"], bg=COLOURS["b-bg"], borderwidth=0, command=command, cursor="@hover.cur", font=FONTS["button"], height=1, text=text)
+    button = tk.Button(border, activebackground=COLOURS["fg"], bg=COLOURS["b-bg"], borderwidth=0, command=command, cursor="@./cursors/hover.cur", fg=COLOURS["bg"], font=FONTS["button"], height=1, text=text)
     button.pack(padx=BORDER, pady=BORDER)
     return border
 
@@ -155,10 +159,14 @@ def processCAPTCHA(guess, value, after):
         notARobotFrame.pack_forget()
         after.pack()
 
+def randomUpperString(length:int) -> str:
+    import random, string
+    return "".join(random.choices(string.ascii_uppercase, k=length))
+
 def notARobot(before, after):
-    import PIL.ImageTk, random, string
+    import PIL.ImageTk
     before.pack_forget()
-    value = "".join(random.choices(string.ascii_uppercase, k=8))
+    value = randomUpperString(8)
     createCAPTCHA(value)
     global notARobotFrame
     notARobotFrame = makeFrame(root)
@@ -177,28 +185,51 @@ def notARobot(before, after):
 
     notARobotFrame.pack()
 
-validPasswords = False
-def checkPasswords(var, index, mode):
+def checkCrData(var, index, mode):
+    issues = 0
     if len(crPasswordInput.get()) < 8:
-        print("not enough")
-        crPassLenLabel.grid(column=0, row=2, columnspan=2)
+        crPassLenLabel.grid(column=0, row=3, columnspan=2)
+        issues += 1
     else:
-        print("enough")
         crPassLenLabel.grid_forget()
     
-    if crPasswordInput.get() == crPassConfirmInput.get():
-        print("match")
+    if crPasswordInput.get() != crPassConfirmInput.get():
+        crPassMatchLabel.grid(column=0, row=4, columnspan=2)
+        issues += 1
+    else:
         crPassMatchLabel.grid_forget()
-    else:
-        print("no match")
-        crPassMatchLabel.grid(column=0, row=3, columnspan=2)
+    
+    if not(len(crEmailInput.get()) > 0 and len(crUsernameInput.get()) > 0):
+        issues += 1
 
-def createAccProcess(username:str, email:str, password:str, confirm:str):
-    if not validPasswords:
-        ...
+    if crUsernameInput.get() in getData().keys():
+        crUserExistsLabel.grid(column=0, row=0, columnspan=2)
+        issues += 1
     else:
-        #Username exists
-        ...
+        crUserExistsLabel.grid_forget()
+
+    if issues == 0:
+        crSubmitButton.winfo_children()[0].config(activebackground=COLOURS["fg"], command=lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get()), cursor="@./cursors/hover.cur", fg=COLOURS["bg"])
+    else:
+        crSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
+    
+def doNothing():
+    root.bell()
+
+def encryptForStorage(data:str) -> str:
+    return data
+
+def createAccProcess(username:str, email:str, password:str):
+    ...
+    #confirmationCode = randomUpperString(6)
+    #emailHTML = """<>"""
+    #emailText = ""
+    #sendMail(email, "TPSSECURITY Email Confirmation", emailHTML, emailText)
+
+
+    #data = getData()
+    #userCipherKey = hashCipherKey(password)
+    #data[username] = {"password": hashPassword(password), "email": encryptForStorage(email)}
 
 def signInProcess(username, password):
     ...
