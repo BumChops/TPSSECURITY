@@ -2,30 +2,52 @@ import hashlib, math, pickle, PIL
 import tkinter as tk
 from tkinter import font
 
+#Style vars
+BORDER = 2
+COLOURS = {"fg": "#ff0a5c", "b-bg": "#676767", "bd": "#680a8e", "bg": "#232323", "txt": "#ffffff"}
+FONTS = {"button": ("OCR A Extended", 12), "label": ("OCR A Extended", 12), "title": ("OCR A Extended", 48)}
+PADDING = 10
+
+#Info setup
+userCipherKey = ""
+username = ""
+
+#Tkinter setup
+root = tk.Tk()
+root.state("zoomed")
+root.title("TPSSECURITY")
+root.iconbitmap("./images/icon.ico")
+root.config(bg=COLOURS["bg"])
+root.config(cursor="@./cursors/default.cur")
+title = tk.StringVar(root, value="TPSSECURITY")
+
 def createCAPTCHA(text:str) -> None:
     from captcha.image import ImageCaptcha #type: ignore (the module is installed)
     image = ImageCaptcha(width=360, height=120)
     image.write(text, "./images/CAPTCHA.png")
 
 def getData() -> dict:
-    # Decrypt binary here
     with open("data.pickle", "rb") as f:
-        return pickle.load(f)
+        readBytes = f.read()
+        inverse = [(255-num) for num in readBytes]
+        return pickle.loads(bytes(inverse))
 
 def setData(overwrite) -> None:
+    readBytes = pickle.dumps(overwrite)
+    invertedBytes = ""
+    inverse = [(255-num) for num in readBytes]
+    invertedBytes = bytes(inverse)
     with open("data.pickle", "wb") as f:
-        pickle.dump(overwrite, f)
-    #Encrypt binary here
+        f.write(invertedBytes)
 
-userCipherKey = ""
 def hashCipherKey(data:str) -> str:
-    string = data.encode("utf-8")
-    hashBin = bin(int(hashlib.sha3_512(string).hexdigest(), 16))
-    hashBin += bin(int(hashlib.sha3_512(string[::-1]).hexdigest(), 16))[2:]
-    hashBin += bin(int(hashlib.sha3_512(string[:math.floor(len(string)/2)]).hexdigest(), 16))[2:]
-    hashBin += bin(int(hashlib.sha3_512(string[math.floor(len(string)/2):]).hexdigest(), 16))[2:]
-    while len(hashBin) < 2050:
-        hashBin = "0b0" + hashBin[2:]
+    hashBin = bin(int(hashlib.sha3_512(data.encode("utf-8")).hexdigest(), 16))[2:]
+    for i in range(7):
+        hashBin += bin(int(hashlib.sha3_512(hashBin.encode("utf-8")).hexdigest(), 16))[2:]
+    return hashBin
+
+    while len(hashBin) < 4096:
+        hashBin = "0" + hashBin[2:]
     return hashBin
 
 def hashPassword(data:str) -> str:
@@ -48,23 +70,8 @@ def sendMail(receiver:str, subject:str, html:str, text:str) -> None:
     msg.attach(MIMEText(html, "html"))
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as s:
-        s.logIn(sender, password)
+        s.login(sender, password)
         s.sendmail(sender, receiver, msg.as_string())
-
-#Style vars
-BORDER = 2
-COLOURS = {"fg": "#ff0a5c", "b-bg": "#676767", "bd": "#680a8e", "bg": "#232323", "txt": "#ffffff"}
-FONTS = {"button": ("OCR A Extended", 12), "label": ("OCR A Extended", 12), "title": ("OCR A Extended", 48)}
-PADDING = 10
-
-#Tkinter setup
-root = tk.Tk()
-root.state("zoomed")
-root.title("TPSSECURITY")
-root.iconbitmap("./images/icon.ico")
-root.config(bg=COLOURS["bg"])
-root.config(cursor="@./cursors/default.cur")
-title = tk.StringVar(root, value="TPSSECURITY")
 
 def onload():
     global titleLabel
@@ -78,6 +85,16 @@ def onload():
     createAccButton = makeButton(logInFrame, "Create Account", lambda: notARobot(logInFrame, createAccFrame))
     signInButton.pack(pady=PADDING)
     createAccButton.pack(pady=PADDING)
+
+    global emailCheckFrame, emailCheckInput
+    emailCheckFrame = makeFrame(root)
+    emailCheckInput = tk.StringVar(root)
+    emailCheckLabel = makeLabel(emailCheckFrame, tk.StringVar(root, value="Enter the verification code from the email: "), tk.LEFT)
+    emailCheckEntry = makeEntry(emailCheckFrame, emailCheckInput)
+    emailCheckLabel.grid(column=0, row=0, pady=PADDING)
+    emailCheckEntry.grid(column=1, row=0, pady=PADDING)
+    emCheSubmitButton = makeButton(emailCheckFrame, "Confirm", lambda: checkEmailCode(emailCheckInput.get()))
+    emCheSubmitButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
 
     global createAccFrame, crPassLenLabel, crPassMatchLabel, crUserExistsLabel, crSubmitButton, crEmailInput, crPasswordInput, crPassConfirmInput, crUsernameInput
     createAccFrame = makeFrame(root)
@@ -117,20 +134,31 @@ def onload():
     crSubmitButton = makeButton(createAccFrame, "Create Account", lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get()))
     crSubmitButton.grid(column=0, row=7, columnspan=2, pady=PADDING)
 
-    global signInFrame
+    global signInFrame, wrongPassLabel, wrongUserLabel, usernameInput, passwordInput
     signInFrame = makeFrame(root)
+    wrongUserLabel = makeLabel(signInFrame, tk.StringVar(root, value="That username doesn't exist!"), tk.CENTER)
+    wrongUserLabel.config(fg=COLOURS["fg"])
+    #wrongUserLabel.grid(column=0, row=0, columnspan=2)
+    wrongPassLabel = makeLabel(signInFrame, tk.StringVar(root, value="Wrong password!"), tk.CENTER)
+    wrongPassLabel.config(fg=COLOURS["fg"])
+    #wrongPassLabel.grid(column=0, row=1, columnspan=2)
     usernameInput = tk.StringVar(root)
     usernameLabel = makeLabel(signInFrame, tk.StringVar(root, value="Username: "), tk.LEFT)
     usernameEntry = makeEntry(signInFrame, usernameInput)
-    usernameLabel.grid(column=0, row=0, pady=PADDING)
-    usernameEntry.grid(column=1, row=0, pady=PADDING)
+    usernameLabel.grid(column=0, row=2, pady=PADDING)
+    usernameEntry.grid(column=1, row=2, pady=PADDING)
     passwordInput = tk.StringVar(root)
     passwordLabel = makeLabel(signInFrame, tk.StringVar(root, value="Password: "), tk.LEFT)
     passwordEntry = makeEntryPass(signInFrame, passwordInput)
-    passwordLabel.grid(column=0, row=1, pady=PADDING)
-    passwordEntry.grid(column=1, row=1, pady=PADDING)
+    passwordLabel.grid(column=0, row=3, pady=PADDING)
+    passwordEntry.grid(column=1, row=3, pady=PADDING)
     submitButton = makeButton(signInFrame, "Sign In", lambda: signInProcess(usernameInput.get(), passwordInput.get()))
-    submitButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+    submitButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
+
+    global mainMenuFrame
+    mainMenuFrame = makeFrame(root)
+    testLabel = makeLabel(mainMenuFrame, tk.StringVar(root, value="Hello World!"), tk.CENTER)
+    testLabel.pack()
 
     logInFrame.pack()
 
@@ -216,23 +244,99 @@ def checkCrData(var, index, mode):
 def doNothing():
     root.bell()
 
-def encryptForStorage(data:str) -> str:
-    return data
+def encryptForStorage(data:str, key:str) -> str:
+    #Vernam cipher
+    encryptedData = ""
+    for i in range(len(data)):
+        binChar = bin(ord(data[i]))[2:]
+        for bit in binChar:
+            if bit != key[i]:
+                encryptedData += "1"
+            else:
+                encryptedData += "0"
+    return encryptedData
+
+def decryptFromStorage(data:str, key:str) -> str:
+    #Vernam cipher
+    decryptedData = ""
+    for i in range(len(data)):
+        binChar = bin(ord(data[i]))[2:]
+        for bit in binChar:
+            if bit != key[i]:
+                decryptedData += "1"
+            else:
+                decryptedData += "0"
+    return decryptedData
+
+def checkEmailCode(code:str):
+    print("HERE! 1")
+    if code == confirmationCode:
+        print("HERE! 2")
+        emailCheckFrame.pack_forget()
+        userCipherKey = hashCipherKey(crPasswordInput.get())
+        print("HERE! 3")
+        data = getData()
+        data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
+        print("HERE! 4")
+        setData(data)
+        print(getData())
+        crUsernameInput.set("")
+        crPasswordInput.set("")
+        crEmailInput.set("")
+        mainMenuFrame.pack()
+    else:
+        emailCheckInput.set("")
 
 def createAccProcess(username:str, email:str, password:str):
-    ...
-    #confirmationCode = randomUpperString(6)
-    #emailHTML = """<>"""
-    #emailText = ""
-    #sendMail(email, "TPSSECURITY Email Confirmation", emailHTML, emailText)
+    global confirmationCode
+    createAccFrame.pack_forget()
+    confirmationCode = randomUpperString(6)
+    emailHTML = f"""<!DOCTYPE html>
+<head>
+    <title>TPSSECURITY Email Confirmation</title>
+    <style>
+        * {{
+            font-family: monospace;
+        }}
+        p {{
+            color: {COLOURS["bd"]};
+            font-size: 14px;
+        }}
+        span {{
+            color: {COLOURS["fg"]};
+            font-size: 18px;
+        }}
+        h3 {{
+            color: {COLOURS["bg"]};
+            font-size: 18px;
+        }}
+    </style>
+</head>
+<body>
+<h3>Your TPSSECURITY email code is: <span>{confirmationCode}</span></h3>
+<p>I am an email bot</p>
+</body>"""
+    emailText = f"Your TPSSECURITY email code is: {confirmationCode}\nI am an email bot"
+    sendMail(email, "TPSSECURITY Email Confirmation", emailHTML, emailText)
+    emailCheckFrame.pack()
 
+def signInProcess(usernameEntry, passwordEntry):
+    wrongPassLabel.grid_forget()
+    wrongUserLabel.grid_forget()
+    if not(usernameEntry in getData().keys()):
+        usernameInput.set("")
+        passwordInput.set("")
+        wrongUserLabel.grid(column=0, row=0, columnspan=2)
+    elif hashPassword(passwordEntry) != getData()[usernameEntry]["password"]:
+        usernameInput.set("")
+        passwordInput.set("")
+        wrongPassLabel.grid(column=0, row=1, columnspan=2)
+    else:
+        username = usernameEntry
+        userCipherKey = hashCipherKey(passwordEntry)
+        signInFrame.pack_forget()
+        mainMenuFrame.pack()
 
-    #data = getData()
-    #userCipherKey = hashCipherKey(password)
-    #data[username] = {"password": hashPassword(password), "email": encryptForStorage(email)}
-
-def signInProcess(username, password):
-    ...
 
 pinkRGB = list(int(COLOURS["fg"][1:][i:i+2], 16) for i in (0, 2, 4))
 purpleRGB = list(int(COLOURS["bd"][1:][i:i+2], 16) for i in (0, 2, 4))
