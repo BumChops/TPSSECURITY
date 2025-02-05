@@ -81,8 +81,11 @@ def onload():
     logInFrame = makeFrame(root)
     signInButton = makeButton(logInFrame, "Sign In", lambda: notARobot(logInFrame, signInFrame))
     createAccButton = makeButton(logInFrame, "Create Account", lambda: notARobot(logInFrame, createAccFrame))
-    signInButton.pack(pady=PADDING)
-    createAccButton.pack(pady=PADDING)
+    logInQuitButton = makeButton(logInFrame, "Quit", quit)
+    signInButton.grid(column=0, row=0, columnspan=2, pady=PADDING)
+    createAccButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
+    logInQuitButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+    
 
     global emailCheckFrame, emailCheckInput
     emailCheckFrame = makeFrame(root)
@@ -162,6 +165,8 @@ def onload():
     mmAddButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
     mmEditButton = makeButton(mainMenuFrame, "Edit my data", doNothing)
     mmEditButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+    mmQuitButton = makeButton(mainMenuFrame, "Quit", quit)
+    mmQuitButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
 
     global viewMenuFrame
     viewMenuFrame = makeFrame(root)
