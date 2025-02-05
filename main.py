@@ -44,10 +44,8 @@ def hashCipherKey(data:str) -> str:
     hashBin = bin(int(hashlib.sha3_512(data.encode("utf-8")).hexdigest(), 16))[2:]
     for i in range(7):
         hashBin += bin(int(hashlib.sha3_512(hashBin.encode("utf-8")).hexdigest(), 16))[2:]
-    return hashBin
-
     while len(hashBin) < 4096:
-        hashBin = "0" + hashBin[2:]
+        hashBin = "0" + hashBin
     return hashBin
 
 def hashPassword(data:str) -> str:
@@ -132,6 +130,7 @@ def onload():
     crPassConfirmLabel.grid(column=0, row=6, pady=PADDING)
     crPassConfirmEntry.grid(column=1, row=6, pady=PADDING)
     crSubmitButton = makeButton(createAccFrame, "Create Account", lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get()))
+    crSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
     crSubmitButton.grid(column=0, row=7, columnspan=2, pady=PADDING)
 
     global signInFrame, wrongPassLabel, wrongUserLabel, usernameInput, passwordInput
@@ -157,8 +156,36 @@ def onload():
 
     global mainMenuFrame
     mainMenuFrame = makeFrame(root)
-    testLabel = makeLabel(mainMenuFrame, tk.StringVar(root, value="Hello World!"), tk.CENTER)
-    testLabel.pack()
+    mmViewButton = makeButton(mainMenuFrame, "View my data", viewData)
+    mmViewButton.grid(column=0, row=0, columnspan=2, pady=PADDING)
+    mmAddButton = makeButton(mainMenuFrame, "Add to my data", addData)
+    mmAddButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
+    mmEditButton = makeButton(mainMenuFrame, "Edit my data", doNothing)
+    mmEditButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+
+    global viewMenuFrame
+    viewMenuFrame = makeFrame(root)
+
+    global addMenuFrame, addKeyInput, addValueInput, addSubmitButton, keyExistsLabel, keyExistsText
+    addMenuFrame = makeFrame(root)
+    keyExistsText = tk.StringVar(root, "The key cannot be empty!")
+    keyExistsLabel = makeLabel(addMenuFrame, keyExistsText, tk.CENTER)
+    keyExistsLabel.config(fg=COLOURS["fg"])
+    keyExistsLabel.grid(column=0, row=0, columnspan=2)
+    addKeyInput = tk.StringVar(root)
+    addKeyInput.trace_add("write", checkAddKey)
+    addKeyLabel = makeLabel(addMenuFrame, tk.StringVar(root, value="Key: "), tk.LEFT)
+    addKeyEntry = makeEntry(addMenuFrame, addKeyInput)
+    addKeyLabel.grid(column=0, row=1, pady=PADDING)
+    addKeyEntry.grid(column=1, row=1, pady=PADDING)
+    addValueInput = tk.StringVar(root)
+    addValueLabel = makeLabel(addMenuFrame, tk.StringVar(root, value="Value: "), tk.LEFT)
+    addValueEntry = makeEntry(addMenuFrame, addValueInput)
+    addValueLabel.grid(column=0, row=2, pady=PADDING)
+    addValueEntry.grid(column=1, row=2, pady=PADDING)
+    addSubmitButton = makeButton(addMenuFrame, "Add new data", lambda: addNewKeyValue(addKeyInput.get(), addValueInput.get()))
+    addSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
+    addSubmitButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
 
     logInFrame.pack()
 
@@ -181,7 +208,7 @@ def makeLabel(parent, textvar, justify):
     return tk.Label(parent, bg=COLOURS["bg"], font=FONTS["label"], fg=COLOURS["txt"], justify=justify, textvariable=textvar)
 
 def processCAPTCHA(guess, value, after):
-    if guess != value:
+    if guess.upper() != value.upper():
         notARobot(notARobotFrame, after)
     else:
         notARobotFrame.pack_forget()
@@ -240,46 +267,83 @@ def checkCrData(var, index, mode):
         crSubmitButton.winfo_children()[0].config(activebackground=COLOURS["fg"], command=lambda: createAccProcess(crUsernameInput.get(), crEmailInput.get(), crPasswordInput.get()), cursor="@./cursors/hover.cur", fg=COLOURS["bg"])
     else:
         crSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
+
+def checkAddKey(var, index, mode):
+    key = addKeyInput.get()
+    value = addValueInput.get()
+    issues = 0
+    if len(key) < 1:
+        keyExistsText.set("The key cannot be empty!")
+        issues += 1
+    elif len(value) > 512:
+        keyExistsText.set("The value cannot be over 512 characters long!")
+        issues += 1
+    elif key in getData()[username].keys():
+        keyExistsText.set("That key already exists!")
+        issues += 1
     
+    if issues == 0:
+        keyExistsLabel.grid_forget()
+        addSubmitButton.winfo_children()[0].config(activebackground=COLOURS["fg"], command=lambda: addNewKeyValue(addKeyInput.get(), addValueInput.get()), cursor="@./cursors/hover.cur", fg=COLOURS["bg"])
+    else:
+        keyExistsLabel.grid(column=0, row=0, columnspan=2)
+        addSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
+
+def addData():
+    mainMenuFrame.pack_forget()
+    addKeyInput.set("")
+    addValueInput.set("")
+    addMenuFrame.pack()
+
+def addNewKeyValue(key:str, value:str):
+    data = getData()
+    data[username][key] = encryptForStorage(value, userCipherKey)
+    setData(data)
+    toMainMenu(addMenuFrame)
+
 def doNothing():
     root.bell()
 
 def encryptForStorage(data:str, key:str) -> str:
     #Vernam cipher
-    encryptedData = ""
+    encryptedText = ""
     for i in range(len(data)):
-        binChar = bin(ord(data[i]))[2:]
-        for bit in binChar:
-            if bit != key[i]:
-                encryptedData += "1"
+        binaryRep = bin(ord(data[i]))[2:]
+        while len(binaryRep) < 8:
+            binaryRep = "0" + binaryRep
+        encryptedBin = ""
+        for j in binaryRep:
+            if j == key[i]:
+                encryptedBin += "0"
             else:
-                encryptedData += "0"
-    return encryptedData
+                encryptedBin += "1"
+        encryptedText += chr(int(encryptedBin, 2))
+    return encryptedText
 
 def decryptFromStorage(data:str, key:str) -> str:
     #Vernam cipher
-    decryptedData = ""
+    decryptedText = ""
     for i in range(len(data)):
-        binChar = bin(ord(data[i]))[2:]
-        for bit in binChar:
-            if bit != key[i]:
-                decryptedData += "1"
+        binaryRep = bin(ord(data[i]))[2:]
+        while len(binaryRep) < 8:
+            binaryRep = "0" + binaryRep
+        decryptedBin = ""
+        for j in binaryRep:
+            if j == key[i]:
+                decryptedBin += "0"
             else:
-                decryptedData += "0"
-    return decryptedData
+                decryptedBin += "1"
+        decryptedText += chr(int(decryptedBin, 2))
+    return decryptedText
 
 def checkEmailCode(code:str):
-    print("HERE! 1")
+    global userCipherKey
     if code == confirmationCode:
-        print("HERE! 2")
         emailCheckFrame.pack_forget()
         userCipherKey = hashCipherKey(crPasswordInput.get())
-        print("HERE! 3")
         data = getData()
         data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
-        print("HERE! 4")
         setData(data)
-        print(getData())
         crUsernameInput.set("")
         crPasswordInput.set("")
         crEmailInput.set("")
@@ -314,16 +378,43 @@ def createAccProcess(username:str, email:str, password:str):
 </head>
 <body>
 <h3>Your TPSSECURITY email code is: <span>{confirmationCode}</span></h3>
-<p>I am an email bot</p>
+<p>I am an email bot.</p>
 </body>"""
-    emailText = f"Your TPSSECURITY email code is: {confirmationCode}\nI am an email bot"
+    emailText = f"Your TPSSECURITY email code is: {confirmationCode}\nI am an email bot."
     sendMail(email, "TPSSECURITY Email Confirmation", emailHTML, emailText)
     emailCheckFrame.pack()
+
+def annoyBen():
+    htmlMsg = f"""<!DOCTYPE html>
+<head>
+    <title>TPSSECURITY Email Confirmation</title>
+    <style>
+        * {{
+            font-family: monospace;
+        }}
+        h3 {{
+            color: {COLOURS["bg"]};
+            font-size: 18px;
+        }}
+    </style>
+</head>
+<body>
+<h3>I'm sorry, but as an A  I language model I cannot respond to that request.</h3>
+<p>I am an email bot.</p>
+</body>"""
+    msg = "I'm sorry, but as an AI language model I cannot respond to that request."
+    i=0
+    while True:
+        i += 1
+        print(i)
+        sendMail("19bshaw@students.priory.herts.sch.uk", str(i), htmlMsg, msg)
 
 def signInProcess(usernameEntry, passwordEntry):
     wrongPassLabel.grid_forget()
     wrongUserLabel.grid_forget()
-    if not(usernameEntry in getData().keys()):
+    if usernameEntry == "ANNOY BEN SHAW":
+        annoyBen()
+    elif not(usernameEntry in getData().keys()):
         usernameInput.set("")
         passwordInput.set("")
         wrongUserLabel.grid(column=0, row=0, columnspan=2)
@@ -332,11 +423,42 @@ def signInProcess(usernameEntry, passwordEntry):
         passwordInput.set("")
         wrongPassLabel.grid(column=0, row=1, columnspan=2)
     else:
+        global username, userCipherKey
         username = usernameEntry
         userCipherKey = hashCipherKey(passwordEntry)
-        signInFrame.pack_forget()
-        mainMenuFrame.pack()
+        toMainMenu(signInFrame)
 
+#userCipherKey = hashCipherKey("i too am")
+#setData({"MouseBites": {"password":hashPassword("i too am"), "data": encryptForStorage("Some data!", userCipherKey), "MORE DATA": encryptForStorage("gndrsklhgs", userCipherKey)}})
+#print(getData()["MouseBites"]["data"])
+#print(":::")
+#print(decryptFromStorage(getData()["MouseBites"]["data"], userCipherKey))
+
+def toMainMenu(frameFrom):
+    frameFrom.pack_forget()
+    mainMenuFrame.pack()
+
+def viewData():
+    mainMenuFrame.pack_forget()
+    for child in viewMenuFrame.winfo_children():
+        child.destroy()
+    userData = getData()[username]
+    keys = userData.keys()
+    i = 0
+    for key in keys:
+        if not(key in ["password", "email"]):
+            keyLabel = makeLabel(viewMenuFrame, tk.StringVar(root, key), tk.RIGHT)
+            valueLabel = makeLabel(viewMenuFrame, tk.StringVar(root, decryptFromStorage(userData[key], userCipherKey)), tk.LEFT)
+            if i % 2 == 0:
+                keyLabel.config(fg=COLOURS["fg"])
+            else:
+                keyLabel.config(fg=COLOURS["bd"])
+            keyLabel.grid(row=i, column=0, pady=PADDING)
+            valueLabel.grid(row=i, column=1, pady=PADDING)
+            i += 1
+    reFromViewButton = makeButton(viewMenuFrame, "I've seen enough", lambda: toMainMenu(viewMenuFrame))
+    reFromViewButton.grid(row=i, column=0, columnspan=2, pady=PADDING)
+    viewMenuFrame.pack()
 
 pinkRGB = list(int(COLOURS["fg"][1:][i:i+2], 16) for i in (0, 2, 4))
 purpleRGB = list(int(COLOURS["bd"][1:][i:i+2], 16) for i in (0, 2, 4))
@@ -359,7 +481,7 @@ def update():
         titleColourPhase = -100
 
     titleLabel.config(fg=colour)
-    root.after(20, update)
+    root.after(40, update)
 
 onload()
 update()
