@@ -433,12 +433,18 @@ def updatePassword(password:str):
         blankNameLabel.grid(column=0, row=0, columnspan=2)
     else:
         print("Change password")
-        #data = getData()
-        #data[username] = data[username]
-        #data.pop(username)
-        #setData(data)
-        #username = name
-        #toMainMenu(editValueFrame)
+        data = getData()
+        newCipherKey = hashCipherKey(password)
+        newPassword = hashPassword(password)
+        for i in data[username].keys():
+            if i == "password":
+                data[username][i] = newPassword
+            else:
+                plaintext = decryptFromStorage(data[username][i], userCipherKey)
+                data[username][i] = encryptForStorage(plaintext, newCipherKey)
+        userCipherKey = newCipherKey
+        setData(data)
+        toMainMenu(editValueFrame)
 
 def updateEmail(value:str):
     ...
