@@ -9,6 +9,8 @@ FONTS = {"button": ("OCR A Extended", 12), "label": ("OCR A Extended", 12), "tit
 PADDING = 10
 
 #Info setup
+doingProtectedEdit = False
+editKey = ""
 userCipherKey = ""
 username = ""
 
@@ -157,16 +159,19 @@ def onload():
     submitButton = makeButton(signInFrame, "Sign In", lambda: signInProcess(usernameInput.get(), passwordInput.get()))
     submitButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
 
-    global mainMenuFrame
+    global mainMenuFrame, mmWelcomeVar
     mainMenuFrame = makeFrame(root)
+    mmWelcomeVar = tk.StringVar(root, "")
+    mmWelcome = makeLabel(mainMenuFrame, mmWelcomeVar, tk.LEFT)
+    mmWelcome.grid(column=0, row=0, columnspan=2, pady=PADDING)
     mmViewButton = makeButton(mainMenuFrame, "View my data", viewData)
-    mmViewButton.grid(column=0, row=0, columnspan=2, pady=PADDING)
+    mmViewButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
     mmAddButton = makeButton(mainMenuFrame, "Add to my data", addData)
-    mmAddButton.grid(column=0, row=1, columnspan=2, pady=PADDING)
-    mmEditButton = makeButton(mainMenuFrame, "Edit my data", doNothing)
-    mmEditButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+    mmAddButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+    mmEditButton = makeButton(mainMenuFrame, "Edit my data", editData)
+    mmEditButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
     mmQuitButton = makeButton(mainMenuFrame, "Quit", quit)
-    mmQuitButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
+    mmQuitButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
 
     global viewMenuFrame
     viewMenuFrame = makeFrame(root)
@@ -191,6 +196,45 @@ def onload():
     addSubmitButton = makeButton(addMenuFrame, "Add new data", lambda: addNewKeyValue(addKeyInput.get(), addValueInput.get()))
     addSubmitButton.winfo_children()[0].config(activebackground=COLOURS["b-bg"], command=doNothing, cursor="@./cursors/no.cur", fg=COLOURS["fg"])
     addSubmitButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
+
+    global editMenuFrame, editKeyInput, wrongKeyLabel
+    editMenuFrame = makeFrame(root)
+    specialDataLabel = makeLabel(editMenuFrame, tk.StringVar(root, value="You can enter 'username', 'password'\nor 'email' to edit them."), tk.CENTER)
+    specialDataLabel.grid(column=0, row=0, columnspan=2, pady=PADDING)
+    wrongKeyLabel = makeLabel(editMenuFrame, tk.StringVar(root, value="That key doesn't exist!"), tk.CENTER)
+    wrongKeyLabel.config(fg=COLOURS["fg"])
+    #wrongKeyLabel.grid(column=0, row=1, columnspan=2)
+    editKeyInput = tk.StringVar(root)
+    editKeyLabel = makeLabel(editMenuFrame, tk.StringVar(root, value="Key: "), tk.LEFT)
+    editKeyEntry = makeEntry(editMenuFrame, editKeyInput)
+    editKeyLabel.grid(column=0, row=2, pady=PADDING)
+    editKeyEntry.grid(column=1, row=2, pady=PADDING)
+    editKeySubButton = makeButton(editMenuFrame, "Confirm", lambda: processEditKey(editKeyInput.get()))
+    editKeySubButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
+
+    global editValueFrame, editValueInput, editValSubButton, blankNameLabel, blankNameText, editDelLabel, editValueEntry, editValueText, confirmValInput, confirmValLabel, confirmValEntry
+    editValueFrame = makeFrame(root)
+    blankNameText = tk.StringVar(root, value="New username cannot be blank!")
+    blankNameLabel = makeLabel(editValueFrame, blankNameText, tk.CENTER)
+    blankNameLabel.config(fg=COLOURS["fg"])
+    #blankNameLabel.grid(column=0, row=0, columnspan=2)
+    editValueInput = tk.StringVar(root, value="")
+    editValueText = tk.StringVar(root, value="New value: ")
+    editValueLabel = makeLabel(editValueFrame, editValueText, tk.LEFT)
+    editValueEntry = makeEntry(editValueFrame, editValueInput)
+    editValueLabel.grid(column=0, row=1, pady=PADDING)
+    editValueEntry.grid(column=1, row=1, pady=PADDING)
+
+    confirmValInput = tk.StringVar(root, value="")
+    confirmValText = tk.StringVar(root, value="Confirm password: ")
+    confirmValLabel = makeLabel(editValueFrame, confirmValText, tk.LEFT)
+    confirmValEntry = makeEntryPass(editValueFrame, confirmValInput)
+    #confirmValLabel.grid(column=0, row=2, pady=PADDING)
+    #confirmValEntry.grid(column=1, row=2, pady=PADDING)
+    editDelLabel = makeLabel(editValueFrame, tk.StringVar(root, value="Leaving the above field blank will delete the key."), tk.CENTER)
+    #editDelLabel.grid(column=0, row=3, columnspan=2, pady=PADDING)
+    editValSubButton = makeButton(editValueFrame, "Confirm", lambda: updateValue(editValueInput.get()))
+    editValSubButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
 
     logInFrame.pack()
 
@@ -283,7 +327,7 @@ def checkAddKey(var, index, mode):
     elif len(value) > 512:
         keyExistsText.set("The value cannot be over 512 characters long!")
         issues += 1
-    elif key in getData()[username].keys():
+    elif key in getData()[username].keys() or key == "username":
         keyExistsText.set("That key already exists!")
         issues += 1
     
@@ -305,6 +349,99 @@ def addNewKeyValue(key:str, value:str):
     data[username][key] = encryptForStorage(value, userCipherKey)
     setData(data)
     toMainMenu(addMenuFrame)
+
+def editData():
+    global editKey
+    editValueEntry.config(show="")
+    editKey = ""
+    mainMenuFrame.pack_forget()
+    editKeyInput.set("")
+    editValueInput.set("")
+    editValSubButton.winfo_children()[0].config(command=updateValue)
+    wrongKeyLabel.grid_forget()
+    editMenuFrame.pack()
+
+def processEditKey(key:str):
+    global doingProtectedEdit, editKey, editValueText
+    editKey = key
+    blankNameLabel.grid_forget()
+    editDelLabel.grid_forget()
+    editValueText.set("New value: ")
+    if key == "username":
+        editMenuFrame.pack_forget()
+        doingProtectedEdit = True
+        editValueText.set("New username: ")
+        editValSubButton.winfo_children()[0].config(command=lambda: updateName(editValueInput.get()))
+        editValueFrame.pack()
+    elif key == "password":
+        editMenuFrame.pack_forget()
+        doingProtectedEdit = True
+        editValueText.set("New password: ")
+        editValSubButton.winfo_children()[0].config(command=lambda: updatePassword(editValueInput.get()))
+        editValueEntry.config(show="*")
+        confirmValLabel.grid(column=0, row=2, pady=PADDING)
+        confirmValEntry.grid(column=1, row=2, pady=PADDING)
+        editValueFrame.pack()
+    elif key == "email":
+        editMenuFrame.pack_forget()
+        editValueText.set("New email: ")
+        doingProtectedEdit = True
+        editValSubButton.winfo_children()[0].config(command=lambda: updateEmail(editValueInput.get()))
+        ...
+    elif not(key in getData()[username].keys()):
+        editKeyInput.set("")
+        wrongKeyLabel.grid(column=0, row=1, columnspan=2, pady=PADDING)
+    else:
+        editDelLabel.grid(column=0, row=3, columnspan=2, pady=PADDING)
+        editMenuFrame.pack_forget()
+        editValueFrame.pack()
+    #If left blank delete (not protected!) key
+
+def updateValue(value:str):
+    data = getData()
+    if value == "":
+        data[username].pop(editKey)
+    else:
+        data[username][editKey] = encryptForStorage(value, userCipherKey)
+    setData(data)
+
+def updateName(name:str):
+    global userCipherKey, blankNameText
+    if name == "":
+        editValueInput.set("")
+        blankNameText = tk.StringVar(root, value="New username cannot be blank!")
+        blankNameLabel.grid(column=0, row=0, columnspan=2)
+    elif name in getData().keys() and name != username:
+        editValueInput.set("")
+        blankNameText = tk.StringVar(root, value="That username already exists!")
+        blankNameLabel.grid(column=0, row=0, columnspan=2)
+    else:
+        data = getData()
+        data[name] = data[username]
+        data.pop(username)
+        setData(data)
+        username = name
+        toMainMenu(editValueFrame)
+
+def updatePassword(password:str):
+    global userCipherKey, blankNameText, confirmValInput
+    if len(password) < 8:
+        blankNameText.set("Password is too short!")
+        blankNameLabel.grid(column=0, row=0, columnspan=2)
+    elif password != confirmValInput.get():
+        blankNameText.set("Passwords don't match!")
+        blankNameLabel.grid(column=0, row=0, columnspan=2)
+    else:
+        print("Change password")
+        #data = getData()
+        #data[username] = data[username]
+        #data.pop(username)
+        #setData(data)
+        #username = name
+        #toMainMenu(editValueFrame)
+
+def updateEmail(value:str):
+    ...
 
 def doNothing():
     root.bell()
@@ -344,15 +481,17 @@ def decryptFromStorage(data:str, key:str) -> str:
 def checkEmailCode(code:str):
     global userCipherKey
     if code == confirmationCode:
-        emailCheckFrame.pack_forget()
-        userCipherKey = hashCipherKey(crPasswordInput.get())
-        data = getData()
-        data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
-        setData(data)
-        crUsernameInput.set("")
-        crPasswordInput.set("")
-        crEmailInput.set("")
-        mainMenuFrame.pack()
+        if doingProtectedEdit:
+            ...
+        else:
+            userCipherKey = hashCipherKey(crPasswordInput.get())
+            data = getData()
+            data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
+            setData(data)
+            crUsernameInput.set("")
+            crPasswordInput.set("")
+            crEmailInput.set("")
+            toMainMenu(emailCheckFrame)
     else:
         emailCheckInput.set("")
 
@@ -440,7 +579,9 @@ def signInProcess(usernameEntry, passwordEntry):
 #print(decryptFromStorage(getData()["MouseBites"]["data"], userCipherKey))
 
 def toMainMenu(frameFrom):
+    global mmWelcomeVar
     frameFrom.pack_forget()
+    mmWelcomeVar.set(f"Welcome, {username}!")
     mainMenuFrame.pack()
 
 def viewData():
