@@ -387,7 +387,7 @@ def processEditKey(key:str):
         editValueText.set("New email: ")
         doingProtectedEdit = True
         editValSubButton.winfo_children()[0].config(command=lambda: updateEmail(editValueInput.get()))
-        ...
+        editValueFrame.pack()
     elif not(key in getData()[username].keys()):
         editKeyInput.set("")
         wrongKeyLabel.grid(column=0, row=1, columnspan=2, pady=PADDING)
@@ -406,7 +406,7 @@ def updateValue(value:str):
     setData(data)
 
 def updateName(name:str):
-    global userCipherKey, blankNameText
+    global blankNameText, username
     if name == "":
         editValueInput.set("")
         blankNameText = tk.StringVar(root, value="New username cannot be blank!")
@@ -432,7 +432,6 @@ def updatePassword(password:str):
         blankNameText.set("Passwords don't match!")
         blankNameLabel.grid(column=0, row=0, columnspan=2)
     else:
-        print("Change password")
         data = getData()
         newCipherKey = hashCipherKey(password)
         newPassword = hashPassword(password)
@@ -446,8 +445,17 @@ def updatePassword(password:str):
         setData(data)
         toMainMenu(editValueFrame)
 
-def updateEmail(value:str):
-    ...
+def updateEmail(email:str):
+    global userCipherKey, blankNameText
+    if email == "":
+        editValueInput.set("")
+        blankNameText = tk.StringVar(root, value="New email cannot be blank!")
+        blankNameLabel.grid(column=0, row=0, columnspan=2)
+    else:
+        data = getData()
+        data[username]["email"] = encryptForStorage(email, userCipherKey)
+        setData(data)
+        toMainMenu(editValueFrame)
 
 def doNothing():
     root.bell()
