@@ -1,15 +1,12 @@
-import hashlib, math, pickle, PIL
 import tkinter as tk
-from tkinter import font
 
 #Style vars
 BORDER = 2
 COLOURS = {"fg": "#ff0a5c", "b-bg": "#676767", "bd": "#680a8e", "bg": "#232323", "txt": "#ffffff"}
 FONTS = {"button": ("OCR A Extended", 12), "label": ("OCR A Extended", 12), "title": ("OCR A Extended", 48)}
 PADDING = 10
-
 #Info setup
-doingProtectedEdit = False
+deletingAccount = False
 editKey = ""
 userCipherKey = ""
 username = ""
@@ -24,17 +21,19 @@ root.config(cursor="@./cursors/default.cur")
 title = tk.StringVar(root, value="TPSSECURITY")
 
 def createCAPTCHA(text:str) -> None:
-    from captcha.image import ImageCaptcha #type: ignore (the module is installed)
+    from captcha.image import ImageCaptcha
     image = ImageCaptcha(width=360, height=120)
     image.write(text, "./images/CAPTCHA.png")
 
 def getData() -> dict:
+    import pickle
     with open("data.pickle", "rb") as f:
         readBytes = f.read()
         inverse = [(255-num) for num in readBytes]
         return pickle.loads(bytes(inverse))
 
 def setData(overwrite) -> None:
+    import pickle
     readBytes = pickle.dumps(overwrite)
     invertedBytes = ""
     inverse = [(255-num) for num in readBytes]
@@ -43,6 +42,7 @@ def setData(overwrite) -> None:
         f.write(invertedBytes)
 
 def hashCipherKey(data:str) -> str:
+    import hashlib
     hashBin = bin(int(hashlib.sha3_512(data.encode("utf-8")).hexdigest(), 16))[2:]
     for i in range(7):
         hashBin += bin(int(hashlib.sha3_512(hashBin.encode("utf-8")).hexdigest(), 16))[2:]
@@ -51,6 +51,7 @@ def hashCipherKey(data:str) -> str:
     return hashBin
 
 def hashPassword(data:str) -> str:
+    import hashlib
     string = data.encode("utf-8")
     hashBin = hashlib.sha3_384(string).hexdigest()
     return hashBin
@@ -170,8 +171,10 @@ def onload():
     mmAddButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
     mmEditButton = makeButton(mainMenuFrame, "Edit my data", editData)
     mmEditButton.grid(column=0, row=3, columnspan=2, pady=PADDING)
+    mmDelButton = makeButton(mainMenuFrame, "Delete my account", deleteAccount)
+    mmDelButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
     mmQuitButton = makeButton(mainMenuFrame, "Quit", quit)
-    mmQuitButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
+    mmQuitButton.grid(column=0, row=5, columnspan=2, pady=PADDING)
 
     global viewMenuFrame
     viewMenuFrame = makeFrame(root)
@@ -224,10 +227,8 @@ def onload():
     editValueEntry = makeEntry(editValueFrame, editValueInput)
     editValueLabel.grid(column=0, row=1, pady=PADDING)
     editValueEntry.grid(column=1, row=1, pady=PADDING)
-
     confirmValInput = tk.StringVar(root, value="")
-    confirmValText = tk.StringVar(root, value="Confirm password: ")
-    confirmValLabel = makeLabel(editValueFrame, confirmValText, tk.LEFT)
+    confirmValLabel = makeLabel(editValueFrame, tk.StringVar(root, value="Confirm password: "), tk.LEFT)
     confirmValEntry = makeEntryPass(editValueFrame, confirmValInput)
     #confirmValLabel.grid(column=0, row=2, pady=PADDING)
     #confirmValEntry.grid(column=1, row=2, pady=PADDING)
@@ -236,6 +237,24 @@ def onload():
     editValSubButton = makeButton(editValueFrame, "Confirm", lambda: updateValue(editValueInput.get()))
     editValSubButton.grid(column=0, row=4, columnspan=2, pady=PADDING)
 
+    global verifyFrame, verWrongPassLabel, verPassInput
+    verifyFrame = makeFrame(root)
+    verWrongPassLabel = makeLabel(verifyFrame, tk.StringVar(root, value="Wrong password!"), tk.CENTER)
+    verWrongPassLabel.config(fg=COLOURS["fg"])
+    #verWrongPassLabel.grid(column=0, row=0, columnspan=2)
+    verPassInput = tk.StringVar(root)
+    verPassLabel = makeLabel(verifyFrame, tk.StringVar(root, value="Current Password: "), tk.LEFT)
+    verPassEntry = makeEntryPass(verifyFrame, verPassInput)
+    verPassLabel.grid(column=0, row=1, pady=PADDING)
+    verPassEntry.grid(column=1, row=1, pady=PADDING)
+    verSubButton = makeButton(verifyFrame, "It's really me", lambda: checkVerify(verPassInput.get()))
+    verSubButton.grid(column=0, row=2, columnspan=2, pady=PADDING)
+
+    global byeFrame
+    byeFrame = makeFrame(root)
+    eraseButton = makeButton(byeFrame, "Erase my data (will close program)", eraseUser)
+    eraseButton.grid(column=0, row=0, columnspan=2, pady=PADDING)
+    
     logInFrame.pack()
 
 def makeButton(parent, text, command):
@@ -361,33 +380,41 @@ def editData():
     wrongKeyLabel.grid_forget()
     editMenuFrame.pack()
 
+def checkVerify(password:str):
+    if hashPassword(password) != getData()[username]["password"]:
+        verWrongPassLabel.grid(column=0, row=0, columnspan=2)
+        verPassInput.set("")
+    else:
+        verifyFrame.pack_forget()
+        if deletingAccount:
+            byeFrame.pack()
+        else:
+            if editKey == "username":
+                editValueText.set("New username: ")
+                editValSubButton.winfo_children()[0].config(command=lambda: updateName(editValueInput.get()))
+                editValueFrame.pack()
+            elif editKey == "password":
+                editValueText.set("New password: ")
+                editValSubButton.winfo_children()[0].config(command=lambda: updatePassword(editValueInput.get()))
+                editValueEntry.config(show="*")
+                confirmValLabel.grid(column=0, row=2, pady=PADDING)
+                confirmValEntry.grid(column=1, row=2, pady=PADDING)
+                editValueFrame.pack()
+            elif editKey == "email":
+                editValueText.set("New email: ")
+                editValSubButton.winfo_children()[0].config(command=lambda: updateEmail(editValueInput.get()))
+                editValueFrame.pack()
+
 def processEditKey(key:str):
-    global doingProtectedEdit, editKey, editValueText
+    global editKey, editValueText
     editKey = key
     blankNameLabel.grid_forget()
     editDelLabel.grid_forget()
+    verWrongPassLabel.grid_forget()
     editValueText.set("New value: ")
-    if key == "username":
+    if key in ["username", "password", "email"]:
         editMenuFrame.pack_forget()
-        doingProtectedEdit = True
-        editValueText.set("New username: ")
-        editValSubButton.winfo_children()[0].config(command=lambda: updateName(editValueInput.get()))
-        editValueFrame.pack()
-    elif key == "password":
-        editMenuFrame.pack_forget()
-        doingProtectedEdit = True
-        editValueText.set("New password: ")
-        editValSubButton.winfo_children()[0].config(command=lambda: updatePassword(editValueInput.get()))
-        editValueEntry.config(show="*")
-        confirmValLabel.grid(column=0, row=2, pady=PADDING)
-        confirmValEntry.grid(column=1, row=2, pady=PADDING)
-        editValueFrame.pack()
-    elif key == "email":
-        editMenuFrame.pack_forget()
-        editValueText.set("New email: ")
-        doingProtectedEdit = True
-        editValSubButton.winfo_children()[0].config(command=lambda: updateEmail(editValueInput.get()))
-        editValueFrame.pack()
+        verifyFrame.pack()
     elif not(key in getData()[username].keys()):
         editKeyInput.set("")
         wrongKeyLabel.grid(column=0, row=1, columnspan=2, pady=PADDING)
@@ -457,6 +484,18 @@ def updateEmail(email:str):
         setData(data)
         toMainMenu(editValueFrame)
 
+def deleteAccount():
+    global deletingAccount
+    mainMenuFrame.pack_forget()
+    deletingAccount = True
+    verifyFrame.pack()
+
+def eraseUser():
+    data = getData()
+    data.pop(username, None)
+    setData(data)
+    quit()
+
 def doNothing():
     root.bell()
 
@@ -495,17 +534,14 @@ def decryptFromStorage(data:str, key:str) -> str:
 def checkEmailCode(code:str):
     global userCipherKey
     if code == confirmationCode:
-        if doingProtectedEdit:
-            ...
-        else:
-            userCipherKey = hashCipherKey(crPasswordInput.get())
-            data = getData()
-            data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
-            setData(data)
-            crUsernameInput.set("")
-            crPasswordInput.set("")
-            crEmailInput.set("")
-            toMainMenu(emailCheckFrame)
+        userCipherKey = hashCipherKey(crPasswordInput.get())
+        data = getData()
+        data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
+        setData(data)
+        crUsernameInput.set("")
+        crPasswordInput.set("")
+        crEmailInput.set("")
+        toMainMenu(emailCheckFrame)
     else:
         emailCheckInput.set("")
 
