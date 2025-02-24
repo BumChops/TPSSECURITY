@@ -532,9 +532,10 @@ def decryptFromStorage(data:str, key:str) -> str:
     return decryptedText
 
 def checkEmailCode(code:str):
-    global userCipherKey
+    global username, userCipherKey
     if code == confirmationCode:
         userCipherKey = hashCipherKey(crPasswordInput.get())
+        username = crUsernameInput.get()
         data = getData()
         data[crUsernameInput.get()] = {"password": hashPassword(crPasswordInput.get()), "email": encryptForStorage(crEmailInput.get(), userCipherKey)}
         setData(data)
@@ -571,10 +572,10 @@ def createAccProcess(username:str, email:str, password:str):
     </style>
 </head>
 <body>
-<h3>Your TPSSECURITY email code is: <span>{confirmationCode}</span></h3>
+<h3>Hello {username}, your TPSSECURITY email code is: <span>{confirmationCode}</span></h3>
 <p>I am an email bot.</p>
 </body>"""
-    emailText = f"Your TPSSECURITY email code is: {confirmationCode}\nI am an email bot."
+    emailText = f"Hello {username}, your TPSSECURITY email code is: {confirmationCode}\nI am an email bot."
     sendMail(email, "TPSSECURITY Email Confirmation", emailHTML, emailText)
     emailCheckFrame.pack()
 
@@ -629,7 +630,7 @@ def signInProcess(usernameEntry, passwordEntry):
 #print(decryptFromStorage(getData()["MouseBites"]["data"], userCipherKey))
 
 def toMainMenu(frameFrom):
-    global mmWelcomeVar
+    global mmWelcomeVar, username
     frameFrom.pack_forget()
     mmWelcomeVar.set(f"Welcome, {username}!")
     mainMenuFrame.pack()
