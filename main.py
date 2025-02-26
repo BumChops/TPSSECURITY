@@ -375,8 +375,8 @@ def editData():
     editKey = ""
     mainMenuFrame.pack_forget()
     editKeyInput.set("")
+    editValSubButton.winfo_children()[0].config(command=lambda: updateValue(editValueInput.get()))
     editValueInput.set("")
-    editValSubButton.winfo_children()[0].config(command=updateValue)
     wrongKeyLabel.grid_forget()
     editMenuFrame.pack()
 
